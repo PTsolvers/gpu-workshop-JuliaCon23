@@ -1,6 +1,9 @@
 using Printf
 using CairoMakie
-using CUDA
+
+using ParallelStencil
+using ParallelStencil.FiniteDifferences2D
+
 
 macro d_xa(A) esc(:($A[ix+1, iz] - $A[ix, iz])) end
 macro d_za(A) esc(:($A[ix, iz+1] - $A[ix, iz])) end

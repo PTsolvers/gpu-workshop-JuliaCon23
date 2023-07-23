@@ -30,7 +30,7 @@ $$\mathcal{L}: K \rightarrow \{\boldsymbol{q}, P_f\}\quad | \quad R(\{\boldsymbo
 The residual of the problem is a vector containing the left-hand side of the system of governing equations, written in a such a form in which the right-hand side is $0$:
 
 <p align="center">
-  <img src="main/docs/eqn/eq01.png" width="360px"/>
+  <img src="./gpu-workshop-JuliaCon23/docs/eqn/eq01.png" width="360px"/>
 </p>
 
 To quantify the discrepancy between the results of the forward model $\mathcal{L}$ and the observations $\mathcal{L}_\mathrm{obs}$, we introduce the _objective function_ $J$, which in the simplest case can be defined as:

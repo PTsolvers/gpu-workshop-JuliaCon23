@@ -457,7 +457,7 @@ This syntax allows computing jacobian-vector products (JVPs):
 
 In this case, `r̄` is an input vector, `x̄` is a storage for the partial derivative (JVP). We use the convention, according to which the bar above the variable denotes the "adjoint" of that variable.
 
-Now we are familiar with Enzyme.jl. Let's begin the hands-on activity! :rocket:
+Now we are familiar with Enzyme.jl and how to use it with ParallelStencil.jl. Let's begin the hands-on activity! :rocket:
 
 ## Hands-on II
 In this section, we will implement the gradient-based inversion algorithm for the permeability of the subsurface. In the first session we used the model setup involving a permeability barrier in the center of the computational domain. Now, we will try reconstruct this permeability barrier knowing only the "observed" values of the pressure.

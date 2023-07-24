@@ -31,7 +31,7 @@
 The goal of today's workshop is to develop a fast iterative GPU-based solver for elliptic equations and use it to:
 1. Solve a steady state subsurface flow problem (geothermal operations, injection and extraction of fluids)
 2. Invert for the subsurface permeability having a sparse array of fluid pressure observations
-3. See that the approach works using a distributed memory approach on multiple GPUs
+3. See that the approach works using a distributed memory parallelisation on multiple GPUs
 
 We will not use any "black-box" tooling but rather try to develop concise and performant codes (300 lines of code, max) that execute on (multi-)GPUs. We will also use automatic differentiation (AD) capabilities and the differentiable Julia stack to automatise the calculation of the adjoint solutions in the gradient-based inversion procedure.
 

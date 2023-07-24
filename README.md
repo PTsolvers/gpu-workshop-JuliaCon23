@@ -476,7 +476,7 @@ First, we will refactor the code in such a way that the forward (and adjoint) so
 
 #### ✏️ Task 1: refactor the code by extracting the forward and inverse solvers into the separate file
 
-Start from the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl). Copy the implementations of all the kernels from the previous file with the sensitivity computation.
+Start from the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl). Copy the implementations of all the kernels from the previous file with the forward solver.
 
 Note that there is one additional kernel `smooth_d!` in this file. This kernel smooths the input field using several steps of diffusion. We wil use this kernel to implement the regularization of the inverse problem. In lay terms, we prevent the inverted permeability field from having sharp gradients. The reasons why it is needed and the derivation of the regularization terms are beyond the scope of this workshop.
 

@@ -102,7 +102,6 @@ end
         P̄f  .= .-∂J_∂Pf
         q̄x  .= 0.0
         q̄y  .= 0.0
-
         @parallel ∇=(Rqx->R̄qx, Rqy->R̄qy, qx->q̄x, qy->q̄y, Pf->P̄f) residual_fluxes!(Rqx, Rqy, qx, qy, Pf, K, dx, dy)
         P̄f[[1, end], :] .= 0.0; P̄f[:, [1, end]] .= 0.0
         @parallel update_pressure!(Ψ_Pf, P̄f, K_max, vdτ, ly, re_a)
@@ -157,13 +156,13 @@ end
 
 @views function main()
     # physics
-    lx, ly  = 2.0, 1.0 # domain extend
-    k0_μ    = 1.0      # background permeability / fluid viscosity
-    kb_μ    = 1e-6     # barrier permeability / fluid viscosity
-    Q_in    = 1.0      # injection flux
-    b_w     = 0.02lx   # barrier width
-    b_b     = 0.3ly    # barrier bottom location
-    b_t     = 0.8ly    # barrier top location
+    lx, ly   = 2.0, 1.0 # domain extend
+    k0_μ     = 1.0      # background permeability / fluid viscosity
+    kb_μ     = 1e-6     # barrier permeability / fluid viscosity
+    Q_in     = 1.0      # injection flux
+    b_w      = 0.02lx   # barrier width
+    b_b      = 0.3ly    # barrier bottom location
+    b_t      = 0.8ly    # barrier top location
     # observations
     xobs_rng = LinRange(-lx / 6, lx / 6, 8)
     yobs_rng = LinRange(0.25ly, 0.85ly , 8)

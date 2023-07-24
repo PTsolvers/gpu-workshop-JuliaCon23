@@ -35,6 +35,18 @@ function smooth!(A2, A; nsm=1)
     return
 end
 
+@parallel_indices (ix) function bc_x!(A, val)
+    A[ix,   1] = val
+    A[ix, end] = val
+    return
+end
+
+@parallel_indices (iy) function bc_y!(A, val)
+    A[  1, iy] = val
+    A[end, iy] = val
+    return
+end
+
 @parallel function residual_fluxes!(Rqx, Rqy, qx, qy, Pf, K, dx, dy)
     @inn_x(Rqx) = @inn_x(qx) + @av_xa(K) * @d_xa(Pf) / dx
     @inn_y(Rqy) = @inn_y(qy) + @av_ya(K) * @d_ya(Pf) / dy
@@ -123,8 +135,12 @@ end
         P̄f  .= .-∂J_∂Pf
         q̄x  .= 0.0
         q̄y  .= 0.0
-        @parallel ∇=(Rqx->R̄qx, Rqy->R̄qy, qx->q̄x, qy->q̄y, Pf->P̄f) residual_fluxes!(Rqx, Rqy, qx, qy, Pf, K, dx, dy)
-        P̄f[[1, end], :] .= 0.0; P̄f[:, [1, end]] .= 0.0
+        @hide_communication (16, 8) begin
+            @parallel ∇=(Rqx->R̄qx, Rqy->R̄qy, qx->q̄x, qy->q̄y, Pf->P̄f) residual_fluxes!(Rqx, Rqy, qx, qy, Pf, K, dx, dy)
+            @parallel (1:size(P̄f,1)) bc_x!(P̄f, 0.0)
+            @parallel (1:size(P̄f,2)) bc_y!(P̄f, 0.0)
+            update_halo!(P̄f)
+        end
         @parallel update_pressure!(Ψ_Pf, P̄f, K_max, vdτ, ly, re_a)
         R̄Pf .= Ψ_Pf
         @parallel ∇=(RPf->R̄Pf, qx->q̄x, qy->q̄y) residual_pressure!(RPf, qx, qy, Qf, dx, dy)

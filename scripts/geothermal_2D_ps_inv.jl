@@ -88,7 +88,7 @@ end
 @views function adjoint_solve!(logK, fwd_params, adj_params, loss_params)
     # unpack forward
     (;Pf, qx, qy, Qf, RPf, Rqx, Rqy, K) = fwd_params.fields
-    (;nx, ny, dx, dy)  = fwd_params.scalars
+    (;nx, ny, dx, dy)                   = fwd_params.scalars
     # unpack adjoint
     (;P̄f, q̄x, q̄y, R̄Pf, R̄qx, R̄qy, Ψ_qx, Ψ_qy, Ψ_Pf)      = adj_params.fields
     (;∂J_∂Pf)                                           = loss_params.fields

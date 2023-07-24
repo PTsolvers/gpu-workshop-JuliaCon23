@@ -464,12 +464,9 @@ In this section, we will implement the gradient-based inversion algorithm for th
 
 > We will use the solution to the forward model as a synthetic dataset instead of real observations. We will only only a subset of the pressure field to emulate the sparsity of the datasets in the real world.
 
-
-### Task 1: Inversion solver
-
 In this exercise, we will implement the gradient descent algorithm to progressively update the permeability $K$ using the gradient of the objective function to match the synthetically generated "observed" pressure field.
 
-In this workshop, we will match only the "observed" pressure field $P_f$ for simplicity, meaning that the objective function only depends on the pressure:
+We will match only the "observed" pressure field $P_f$ for simplicity, meaning that the objective function only depends on the pressure:
 
 $$
 J(P_f(K); P_\mathrm{obs}) = \frac{1}{2}\int_\Omega\left[P_f(K) - P_\mathrm{obs}\right]^2\,\mathrm{d}\Omega~,
@@ -477,7 +474,7 @@ $$
 
 First, we will refactor the code in such a way that the forward (and adjoint) solution loop is in a separate function.
 
-#### ✏️ Task 1a: refactor the code by extracting the forward and inverse solvers into the separate file
+#### ✏️ Task 1: refactor the code by extracting the forward and inverse solvers into the separate file
 
 Start from the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl). Copy the implementations of all the kernels from the previous file with the sensitivity computation.
 
@@ -498,7 +495,7 @@ You can temporarily comment the rest of the code and run it to make sure that it
 
 > Note that we pass the logarithm of permeability  $K$ into both the forward and adjoint solvers. This is necessary since the permeability in the barrier is 6 orders of magnitude lower that that of the surrounding subsurface. This is characteristic for the Earth's crust. Using the logarithm of the permeability as the control variable makes the inversion procedure much more robust, and avoids accidentally making the permeability negative, with would result in instability.
 
-#### ✏️ Task 1b: implementing objective function and its gradient
+#### ✏️ Task 2: implementing objective function and its gradient
 
 We have two more new functions in the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl), namely `loss` and `∇loss!`. "Loss" is just another name for the objective function (which is also often called the "cost function"). It is obvious that in order to evaluate the loss function, one has to run the forward solver, and to evaluate the gradient, one needs to make the forward solve, followed by adjoint solve, and finally evaluate the gradient. Replace the `???` with corresponding calls to the forward and adjoint solvers, and finally call the gradient of the `residual_fluxes!` function. Look at the mathematial definition of the gradient $\mathrm{d}J/\mathrm{d}K$ to figure out how to initialize the parameters `R̄qx` and `R̄qy`.
 
@@ -530,7 +527,7 @@ As we'll see, the quality of inversions is significantly affected by the availab
 
 Try to execute the functions `loss` and `∇loss!` in the code to make sure your implementation works as expected.
 
-#### ✏️ Task 1c: use Optim.jl to minimize the objective function
+#### ✏️ Task 3: use Optim.jl to minimize the objective function
 We can use the functions `loss` and `∇loss!` to iteratively update the permeability. We introduce the following shortcuts using the Julia [closures syntax](https://docs.julialang.org/en/v1/devdocs/functions/#Closures):
 
 ```julia

@@ -4,16 +4,272 @@
 
 [**:eyes: watch the workshop LIVE recording**]() (_coming soon_)
 
-
-:point_right: **Useful notes:**
-- :bulb: The [Getting started](#getting-started) will help you set up.
-
-
 > :warning: Make sure to `git pull` this repo right before starting the workshop in order to ensure you have access to the latest updates
 
+## Program
+- [Getting started](#getting-started)
+- [Brief **intro to Julia for HPC** :book:](#julia-for-hpc)
+  - Performance, CPUs, GPUs, array and kernel programming
+- [Presentation of **the challenge of today** :book:](#the-challenge-of-today)
+  - Optimising injection/extraction from a heterogeneous reservoir
+- [**Hands-on I** - solving the forward problem :computer:](#hands-on-i)
+  - Steady-state diffusion problem
+  - The accelerated pseudo-transient method
+  - Backend agnostic kernel programming with math-close notation
+- [Presentation of **the optimisation problem** :book:](#the-optimisation-problem)
+  - Tha adjoint method
+  - Julia and the automatic differentiation (AD) tooling
+- [**Hands-on II** - HPC GPU-based inversions :computer:](#hands-on-ii)
+  - The adjoint problem using AD
+  - GPU-based adjoint solver using [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) from [ParallelStencil.jl]() TODO
+  - Gradient-based inversion using [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl)
+- [Wrapping-up](#wrapping-up)
+  - **Demo**: Multi-GPU inversion using AD and distributed-memory parallelisation with [ImplicitGlobalGrid.jl]() TODO
+  - What we learned - **recap**
+
+## The `SMALL` print
+The goal of today's workshop is to develop a fast iterative GPU-based solver for elliptic equations and use it to:
+1. Solve a steady state subsurface flow problem (geothermal operations, injection and extraction of fluids)
+2. Invert for the subsurface permeability having a sparse array of fluid pressure observations
+3. See that the approach works using a distributed memory approach on multiple GPUs
+
+We will not use any "black-box" tooling but rather try to develop concise and performant codes (300 lines of code, max) that execute on (multi-)GPUs. We will also use automatic differentiation (AD) capabilities and the differentiable Julia stack to automatise the calculation of the adjoint solutions in the gradient-based inversion procedure.
+
+The main Julia packages we will rely on are:
+- [ParallelStencil.jl]() for architecture agnostic TODO
+- [ImplicitGlobalGrid.jl]() for distributed memory parallelisation TODO
+- [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) for AD on GPUs
+- [CairoMakie.jl](https://github.com/MakieOrg/Makie.jl) for visualisation
+- [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl) to implement an optimised gradient-descent procedure
+
+Most of the workshop is based on "hands-on". Changes to the scripts are incremental and should allow to build up complexity throughout the day. Blanked-out scripts for most of the steps are available in the [scripts](scripts/) folder. Solutions scripts (following the `s_xxx.jl` pattern) will are available in the [scripts_solutions](scripts_solutions) folder.
+
+:rocket: **Note that we will not extensively investigate performance during this workshop because of time limitations. However, there will be talk given by Sam Omlin focussing specifically on this topic:**
+TODO
+
+#### :bulb: Useful extra resources
+- The Julia language: [https://julialang.org](https://julialang.org)
+- PDE on GPUs ETH Zurich course: [https://pde-on-gpu.vaw.ethz.ch](https://pde-on-gpu.vaw.ethz.ch)
+- SCALES workshop link TODO
+
+## Getting started
+Before we start, let's make sure that everyone can run the presented codes on either their local or remote CPU, ideally GPU machine.
+
+The fast-track is to clone this repo
+```
+git clone TODO
+```
+
+Once done, navigate to the cloned folder, launch Julia (we will demo the workshop using VSCode), and instantiate the project (upon typing `] instantiate` from within the REPL).
+
+If all went fine, you should be able to execute the following command in your Julia REPL:
+```julia-repl
+julia> include("scripts/visu_2D.jl")
+```
+
+which will produce this figure:
+
+![out visu](docs/out_visu_2D.png)
+
+## Julia for HPC
+The Julia at scale effort, the Julia HPC packages, and the overall Julia for HPC motivation (two language barrier)
+
+TODO list some of the Julia for HPC stack
+
+### The (yet invisible) cool stuff
+Today, we will develop code that:
+- Runs on multiple graphics cards using the Julia language
+- Uses a fully local and iterative approach (scalability)
+- Retrieves automatically the Jacobian Vector Product (JVP) using automatic differentiation (AD)
+- (All scripts feature about 300 lines of code)
+
+Too good to be true? Hold on 🙂 ...
+
+### Why to still bother with GPU computing in 2023
+- It's around for more than a decade
+- It shows massive performance gain compared to serial CPU computing
+- First exascale supercomputer, Frontier, is full of GPUs
+![Frontier](docs/frontier.png)
+
+### Performance that matters
+![cpu_gpu_evo](docs/cpu_gpu_evo.png)
+
+#### Hardware limitations
+Taking a look at a recent GPU and CPU:
+- Nvidia Tesla A100 GPU
+- AMD EPYC "Rome" 7282 (16 cores) CPU
+
+| Device         | TFLOP/s (FP64) | Memory BW TB/s | Imbalance (FP64)     |
+| :------------: | :------------: | :------------: | :------------------: |
+| Tesla A100     | 9.7            | 1.55           | 9.7 / 1.55  × 8 = 50 |
+| AMD EPYC 7282  | 0.7            | 0.085          | 0.7 / 0.085 × 8 = 66 |
+
+**Meaning:** we can do about 50 floating point operations per number accessed from main memory.
+Floating point operations are "for free" when we work in memory-bounded regimes.
+
+#### Numerical limitations
+Moreover, the cost of evaluating a first derivative $∂A / ∂x$ using finite-differences:
+```julia
+q[ix] = -D * (A[ix+1] - A[ix]) / dx
+```
+consists of:
+- 1 read (`A`) + 1 write (`q`) => $2 × 8$ = **16 Bytes transferred**
+- 1 addition + 1 multiplication + 1 division => **3 floating point operations**
+
+_assuming $D$, $∂x$ are scalars, $q$ and $A$ are arrays of `Float64` (read from main memory)_
+
+:bulb: **Requires to re-think the numerical implementation and solution strategies**
+
+### The advantage of GPUs
+GPUs have a large memory bandwidth, which is **crucial** since we are memory bounded.
+
+👉 Let's assess how close from memory copy (1355 GB/s) we can get solving a 2D diffusion problem:
+
+$$ ∇⋅(D ∇ C) = \frac{∂C}{∂t} $$
+
+on an Nvidia Tesla A100 GPU (using a simple [perftest.jl](scripts/perftest.jl) script).
+
+### Why to still bother with GPU computing in 2023
+Because it is still challenging:
+- Very few codes use it efficiently.
+- It requires to rethink the solving strategy as non-local operations will kill the fun.
+
+## The challenge of today
+The goal fo today is to solve a subsurface flow problem related to injection and extraction of fluid in the underground as it could occur in geothermal operations. For this purpose, we will solve an elliptic problem for fluid pressure diffusion, given impermeable boundary conditions (no flux) and two source terms, injection and extraction wells. In addition, we will place a low permeability barrier in-between the wells to simulate a more challenging flow configuration. The model configuration is depicted hereafter:
+
+![model setup](docs/model_setup.png)
+
+Despite looking simple, this problem presents several challenges to be solved efficiently. We will need to:
+- efficiently solve an elliptic equation for the pressure
+- handle source terms
+- handle spatially variable material parameters
+
+> :bulb: For practical purposes, we will work in 2D, however everything we will develop today is readily extensible to 3D.
+
+The corresponding system of equation reads:
+
+$$ q = -K~∇P_f ~, $$
+
+$$ 0 = -∇⋅q + Q_f~, $$
+
+where $q$ is the diffusive flux, $P_f$ the fluid pressure, $K$ is the spatially variable diffusion coefficient, and $Q_f$ the source term.
+
+We will use an accelerated iterative solving strategy combined to a finite-difference discretisation on a regular Cartesian staggered grid:
+
+![staggrid](docs/staggrid.png)
+
+The iterative approach relies in replacing the 0 in the mass balance equation by a pseudo-time derivative $∂/∂\tau$ and let it reach a steady state:
+
+$$ \frac{∂P_f}{∂\tau} = -∇⋅q + Q_f~. $$
+
+Introducing the residual $RP_f$, one can re-write the system of equations as:
+
+$$ q = -K~∇P_f ~, $$
+
+$$ RP_f = ∇⋅q -Q_f~, $$
+
+$$ \frac{∂P_f}{∂\tau} = -RP_f~. $$
+
+We will stop the iterations when the $\mathrm{L_{inf}}$ norm of $P_f$ drops below a defined tolerance `max(abs.(RPf)) < ϵtol`.
+
+This rather naive iterative strategy can be accelerated using the accelerated pseudo-transient method [(Räss et al., 2022)](https://doi.org/10.5194/gmd-15-5757-2022). In a nutshell, pseudo-time derivative can also be added to the fluxes turning the system of equations into a damped wave equation. The resulting augmented system of accelerated equations reads:
+
+$$ Rq = q +K~∇P_f ~, $$
+
+$$ \frac{∂q}{∂\tau_q} = -Rq~, $$
+
+$$ RP_f = ∇⋅q -Q_f~, $$
+
+$$ \frac{∂P_f}{∂\tau_p} = -RP_f~. $$
+
+Finding the optimal damping parameter entering the definition of $∂\tau_q$ and $∂\tau_p$ further leads to significant acceleration in the solution procedure.
+
+## Hands-on I
+Let's get started. In this first hands-on, we will work towards making an efficient iterative GPU solver for the forward steady state flow problem.
+
+### ✏️ Task 1: Steady-state diffusion problem
+The first script we will look at is [geothermal_2D_noacc.jl](scripts/geothermal_2D_noacc.jl). This script builds upon the [visu_2D.jl](scripts/visu_2D.jl) scripts and contains the basic ingredients to iteratively solve the elliptic problem for fluid pressure diffusion with spatially variable permeability.
+
+👉 Let's run the [geothermal_2D_noacc.jl](scripts/geothermal_2D_noacc.jl) script and briefly check how the iteration count normalised by `nx` scales when changing the grid resolution.
+
+### ✏️ Task 2: The accelerated pseudo-transient method
+As you can see, the overall iteration count is really large and actually scales quadratically with increasing grid resolution.
+
+To address this issue, we can implement the accelerated pseudo-transient method [(Räss et al., 2022)](https://doi.org/10.5194/gmd-15-5757-2022). Practically, we will define residuals for both x and y fluxes (`Rqx`, `Rqy`) and provide an update rule based on some optimal numerical parameters consistent with the derivations in [(Räss et al., 2022)](https://doi.org/10.5194/gmd-15-5757-2022).
+
+This acceleration implemented in the [geothermal_2D.jl](scripts/geothermal_2D.jl) script, we now (besides other changes):
+- reduced the cfl from `clf = 1 / 4.1` to `cfl = 1 / 2.1`
+- changed `dτ = cfl * min(dx, dy)^2` to `vdτ = cfl * min(dx, dy)`
+- introduced a numerical Reynolds number (`re = 0.8π`)
+
+👉 Let's run the [geothermal_2D.jl](scripts/geothermal_2D.jl) script and check how the iteration count scales as function of grid resolution.
+
+> :bulb: Have a look at SCALES TODO workshop repo if you are interested in the intermediate steps.
+### ✏️ Task 3: Backend agnostic kernel programming with math-close notation
+Now that we have settled the algorithm, we want to implement it in a backend-agnostic fashion in order to overcome the two-language barrier, having a **unique script** to allow for rapid prototyping and efficient production use. This script should ideally target CPU and various GPU architectures and allow for "math-close" notation of the physics. For this purpose, we will use [ParallelStencil](). 
+
+👉 Let's open the [geothermal_2D_ps.jl](scripts/geothermal_2D_ps.jl) script and add the missing pieces following the steps.
+
+First, we need to use ParallelStencil and the finite-difference helper module:
+```julia
+using ParallelStencil
+using ParallelStencil.FiniteDifferences2D
+```
+
+Then, we can initialise ParallelStencil choosing the backend (`Threads`, `CUDA`, `AMDGPU`), the precision (`Float32`, `Float64`, or others, complex) and the number of spatial dimensions (`1`, `2`, or `3`). For Nvidia GPUs in double precision and 2D it will be
+```julia
+@init_parallel_stencil(CUDA, Float64, 2)
+```
+
+Then, we will move the physics computations into functions and split them into 4 functions:
+```julia
+@parallel function residual_fluxes!(Rqx, Rqy, ???)
+    @inn_x(Rqx) = ???
+    @inn_y(Rqy) = ???
+    return
+end
+
+@parallel function residual_pressure!(RPf, ???)
+    @all(RPf) = ???
+    return
+end
+
+@parallel function update_fluxes!(qx, qy, ???)
+    @inn_x(qx) = ???
+    @inn_y(qy) = ???
+    return
+end
+
+@parallel function update_pressure!(Pf, ???)
+    @all(Pf) = ???
+    return
+end
+```
+Use the helper macros from the `ParallelStencil.FiniteDifferences2D` module to implement averaging, differentiating and inner point selection. Type:
+```julia-repl
+julia> ?
+
+help?> FiniteDifferences2D
+```
+for more information on the available macros.
+
+Next, we can change the initialisation of arrays from e.g. `zeros(Float64, nx, ny)` to `@zeros(nx, ny)`. Also, note that to "upload" an array `A` to the defined backend you can use `Data.Array(A)` and to "gather" it back as CPU array `Array(A)`.
+
+Then we have to call the compute functions from within the iteration loop using the `@parallel` keyword:
+```julia
+@parallel residual_fluxes!(Rqx, Rqy, ???)
+@parallel update_fluxes!(qx, qy, ???)
+@parallel residual_pressure!(RPf, ???)
+@parallel update_pressure!(Pf, ???)
+```
+
+As last step, we have to make sure to "gather" arrays for visualisation back to CPU arrays using `Array()`.
+
+👉 Run the [geothermal_2D_ps.jl](scripts/geothermal_2D_ps.jl) script and check execution speed on CPU and GPU (if available). Have a look at the [s_geothermal_2D_ps.jl](scripts_solutions/s_geothermal_2D_ps.jl) script if you are blocked or need hints.
+
+> :bulb: Have a look at SCALES TODO workshop repo if you are interested in the intermediate steps going from array to kernel programming on both CPU and GPU.
 
 ## The optimisation problem
-
 In the first part of this workshop, we have learned how to compute the fluid pressure and fluxes in the computational domain with a given permeability distribution. In many practical applications the properties of the subsurface, such as the permeability, are unknown or poorly constrained, and the direct measurements are very sparse as they would require extracting the rock samples and performing laboratory experiments. In many cases, the _outputs_ of the simulation, i.e. the pressure and the fluxes, can be measured in the field at much higher spatial and temporal resolution. Therefore, it is useful to be able to determine such a distribution of the properties of the subsurface, that the modelled pressures and fluxes match the observations as close as possible. The task of finding this distribution is referred to as _the inverse modelling_. In this session, we will design and implement the inverse model for determining the permeability field, using the features of Julia, such as GPU programming and automatic differentiation.
 
 ### Introduction
@@ -28,13 +284,13 @@ $$\mathcal{L}: K \rightarrow \{\boldsymbol{q}, P_f\}\quad | \quad R(\{\boldsymbo
 The residual of the problem is a vector containing the left-hand side of the system of governing equations, written in a such a form in which the right-hand side is $0$:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq01.png" width="360px"/>
+  <img src="docs/eqn/eq01.png" width="360px"/>
 </p>
 
 To quantify the discrepancy between the results of the forward model $\mathcal{L}$ and the observations $\mathcal{L}_\mathrm{obs}$, we introduce the _objective function_ $J$, which in the simplest case can be defined as:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq02.png" width="360px"/>
+  <img src="docs/eqn/eq02.png" width="360px"/>
 </p>
 
 where $\Omega$ is the computational domain.
@@ -42,7 +298,7 @@ where $\Omega$ is the computational domain.
 The goal of the inverse modelling is to find such a distribution of the parameter $K$ which minimises the objective function $J$:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq03.png" width="260px"/>
+  <img src="docs/eqn/eq03.png" width="260px"/>
 </p>
 
 Therefore, the inverse modelling is tightly linked to the field of mathematical optimization. Numerous methods of finding the optimal value of $K$ exist, but in this workshop we will focus on _gradient-based_ methods. One of the simplest gradient-based method is the method of _the gradient descent_.
@@ -63,7 +319,7 @@ The objective function $J$ is a function of the solution $\mathcal{L}$, which de
 
 <table>
   <td><p align="center">
-    <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq04.png" width="220px"/>
+    <img src="docs/eqn/eq04.png" width="220px"/>
   </p></td>
   <td>(1)</td>
 </table>
@@ -77,7 +333,7 @@ Note that the solution $\mathcal{L}$ is a vector containing the fluxes $\boldsym
 
 <table>
 <td><p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq05.png" width="260px""/>
+  <img src="docs/eqn/eq05.png" width="260px""/>
 </p></td>
 <td>(2)</td>
 </table>
@@ -85,13 +341,13 @@ Note that the solution $\mathcal{L}$ is a vector containing the fluxes $\boldsym
 To compute this tricky term, we note that the solution to the forward problem nullifies the residual $R$. Since both $R_q=0$ and $R_{P_f}=0$ for any solution $\{\boldsymbol{q}, P_f\}$, the total derivative of $R_q$ and $R_{P_f}$ w.r.t. $K$ should be also $0$:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq06.png" width="480px"/>
+  <img src="docs/eqn/eq06.png" width="480px"/>
 </p>
 
 This is the system of equations which could be solved for $\mathrm{d}\boldsymbol{q}/\mathrm{d}K$ and $\mathrm{d}P_f/\mathrm{d}K$. It useful to recast this system into a matrix form. Defining $R_{f,g} = \partial R_f/\partial g$ we obtain:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq07.png" width="360px"/>
+  <img src="docs/eqn/eq07.png" width="360px"/>
 </p>
 
 One could solve this system of equations to compute the derivatives. However, the sizes of the unknowns $\mathrm{d}\boldsymbol{q}/\mathrm{d}K$ and $\mathrm{d}P_f/\mathrm{d}K$ are $N_{\boldsymbol{q}}\times N_K$ and $N_{P_f}\times N_K$, respectively. Recalling that in 2D number of grid points is $N = n_x\times n_y$, we can estimate that $N_{\boldsymbol{q}} = 2N$ since the vector field has 2 components in 2D, and $N_K = N$. Solving this system would be equivalent to the direct perturbation method, and is prohibitively expensive.
@@ -100,7 +356,7 @@ Luckily, we are only interested in evaluating the obejective function gradient (
 
 <table>
 <td><p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq08.png" width="350px"/>
+  <img src="docs/eqn/eq08.png" width="350px"/>
 </p></td>
 <td>(3)</td>
 </table>
@@ -108,7 +364,7 @@ Luckily, we are only interested in evaluating the obejective function gradient (
 The sizes of the unknowns $\Psi_{\boldsymbol{q}}$ and $\Psi_{P_f}$ are $N_{\boldsymbol{q}}\times 1$ and $N_{P_f}\times 1$, respectively. Therefore, solving the adjoint equation involves only one linear solve! The "tricky term" in the objective function gradient could be then easily computed. This is most evident if we recast the equation (2) into the matrix form:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq09.png" width="500px"/>
+  <img src="docs/eqn/eq09.png" width="500px"/>
 </p>
 
 Phew, there is a lot to process :sweat_smile:! We now established a very efficient way of computing point-wise gradients of the objective function. Now, we only need to figure out how to solve the adjoint equation (3).
@@ -117,7 +373,7 @@ Phew, there is a lot to process :sweat_smile:! We now established a very efficie
 In the same way that we solve the steady-state forward problem by integrating the equations given by residual $R$ in pseudo-time, we can augment the system (3) with the pseudo-time derivatives of the adjoint variables $\Psi_{\boldsymbol{q}}$ and $\Psi_{P_f}$:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq10.png" width="450px"/>
+  <img src="docs/eqn/eq10.png" width="450px"/>
 </p>
 
 With this approach, we never need to explicitly store the matrix of the adjoint problem. Instead, we only need to evaluate the product of this matrix and the adjoint variables at the current iteration in pseudo-time. It is very similar to just computing the residuals of the current forward solution.
@@ -422,3 +678,12 @@ plt.err[1] = Point2.(iters_evo, errs_evo)
 ```
 
 Compare the convergence rate between your implementation of gradient descent and the one from Optim.jl.
+
+## Wrapping-up
+As final step, we will see that the inversion workflow we implemented allows to port our scripts to distributed memory parallelisation on e.g. multiple GPUs using [ImplicitGlobalGrid.jl]() and recap what we learned in this workshop.
+
+### Scalable and multi-GPUs inversions
+
+
+### Recap
+

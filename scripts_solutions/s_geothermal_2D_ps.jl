@@ -1,10 +1,37 @@
 using Printf
 using CairoMakie
+using ParallelStencil
+using ParallelStencil.FiniteDifferences2D
+
+@init_parallel_stencil(Threads, Float64, 2)
+# @init_parallel_stencil(CUDA, Float64, 2)
 
 @views avx(A) = 0.5 .* (A[1:end-1, :] .+ A[2:end, :])
 @views avy(A) = 0.5 .* (A[:, 1:end-1] .+ A[:, 2:end])
 @views maxloc(A) = max.(A[2:end-1, 2:end-1], max.(max.(A[1:end-2, 2:end-1], A[3:end, 2:end-1]),
                                                   max.(A[2:end-1, 1:end-2], A[2:end-1, 3:end])))
+
+@parallel function residual_fluxes!(Rqx, Rqy, qx, qy, Pf, K, dx, dy)
+    @inn_x(Rqx) = @inn_x(qx) + @av_xa(K) * @d_xa(Pf) / dx
+    @inn_y(Rqy) = @inn_y(qy) + @av_ya(K) * @d_ya(Pf) / dy
+return
+end
+
+@parallel function residual_pressure!(RPf, qx, qy, Qf, dx, dy)
+    @all(RPf) = @d_xa(qx) / dx + @d_ya(qy) / dy - @all(Qf)
+    return
+end
+
+@parallel function update_fluxes!(qx, qy, Rqx, Rqy, cfl, nx, ny, re)
+    @inn_x(qx) = @inn_x(qx) - @inn_x(Rqx) / (1.0 + 2cfl * nx / re)
+    @inn_y(qy) = @inn_y(qy) - @inn_y(Rqy) / (1.0 + 2cfl * ny / re)
+    return
+end
+
+@parallel function update_pressure!(Pf, RPf, K_max, vdτ, ly, re)
+    @all(Pf) = @all(Pf) - @all(RPf) * (vdτ * ly / re) / @all(K_max)
+    return
+end
 
 @views function main()
     # physics
@@ -16,30 +43,33 @@ using CairoMakie
     b_b     = 0.3ly    # barrier bottom location
     b_t     = 0.8ly    # barrier top location
     # numerics
-    ny      = 63
+    ny      = 127
     nx      = ceil(Int, (ny + 1) * lx / ly) - 1
-    cfl     = 1 / 4.1
+    cfl     = 1 / 2.1
     ϵtol    = 1e-6
-    maxiter = 2e3nx
-    ncheck  = 20nx
+    maxiter = 30nx
+    ncheck  = 2nx
+    re      = 0.8π
     st      = ceil(Int, nx / 30)
     # preprocessing
     dx, dy  = lx / nx, ly / ny
     xc, yc  = LinRange(-lx / 2 + dx / 2, lx / 2 - dx / 2, nx), LinRange(dy / 2, ly - dy / 2, ny)
-    dτ      = cfl * min(dx, dy)^2
+    vdτ     = cfl * min(dx, dy)
     # init
-    Pf      = zeros(nx, ny)
-    RPf     = zeros(nx, ny)
-    qx      = zeros(nx + 1, ny)
-    qy      = zeros(nx, ny + 1)
-    Qf      = zeros(nx, ny)
-    K       = k0_μ .* ones(nx, ny)
+    Pf      = @zeros(nx, ny)
+    RPf     = @zeros(nx, ny)
+    qx      = @zeros(nx + 1, ny)
+    Rqx     = @zeros(nx + 1, ny)
+    qy      = @zeros(nx, ny + 1)
+    Rqy     = @zeros(nx, ny + 1)
+    Qf      = @zeros(nx, ny)
+    K       = k0_μ .* @ones(nx, ny)
     # set low permeability barrier location
     K[ceil(Int, (lx/2-b_w)/dx):ceil(Int, (lx/2+b_w)/dx), ceil(Int, b_b/dy):ceil(Int, b_t/dy)] .= kb_μ
     # set wells location
     x_iw, x_ew, y_w = ceil.(Int, (lx / 5 / dx, 4lx / 5 / dx, 0.45ly / dy)) # well location
-    Qf[x_iw, y_w] =  Q_in / dx / dy # injection
-    Qf[x_ew, y_w] = -Q_in / dx / dy # extraction
+    Qf[x_iw:x_iw, y_w:y_w] .=  Q_in / dx / dy # injection
+    Qf[x_ew:x_ew, y_w:y_w] .= -Q_in / dx / dy # extraction
     # init visu
     iters_evo = Float64[]; errs_evo = Float64[]
     qM, qx_c, qy_c = zeros(nx, ny), zeros(nx, ny), zeros(nx, ny)
@@ -48,8 +78,8 @@ using CairoMakie
            K   = Axis(fig[1, 2][1, 1]; aspect=DataAspect(), title="log10(K)"),
            qM  = Axis(fig[2, 1][1, 1]; aspect=DataAspect(), title="|q|"),
            err = Axis(fig[2, 2]; yscale=log10, title="Convergence", xlabel="# iter/nx", ylabel="error"), )
-    plt = (fld = ( Pf = heatmap!(ax.Pf, xc, yc, Pf; colormap=:turbo, colorrange=(-1,1)),
-                   K  = heatmap!(ax.K , xc, yc, log10.(K); colormap=:turbo, colorrange=(-6,0)),
+    plt = (fld = ( Pf = heatmap!(ax.Pf, xc, yc, Array(Pf); colormap=:turbo, colorrange=(-1,1)),
+                   K  = heatmap!(ax.K , xc, yc, Array(log10.(K)); colormap=:turbo, colorrange=(-6,0)),
                    qM = heatmap!(ax.qM, xc, yc, qM; colormap=:turbo, colorrange=(0,30)),
                    ar = arrows!(ax.Pf, xc[1:st:end], yc[1:st:end], qx_c[1:st:end, 1:st:end], qy_c[1:st:end, 1:st:end]; lengthscale=0.05, arrowsize=15), ),
            err = scatterlines!(ax.err, Point2.(iters_evo, errs_evo), linewidth=4), )
@@ -61,18 +91,18 @@ using CairoMakie
     # iterative loop
     err = 2ϵtol; iter = 1
     while err >= ϵtol && iter <= maxiter
-        qx[2:end-1, :]  .= .-avx(K) .* diff(Pf, dims=1) ./ dx
-        qy[:, 2:end-1]  .= .-avy(K) .* diff(Pf, dims=2) ./ dy
-        RPf             .= diff(qx, dims=1) ./ dx .+ diff(qy, dims=2) ./ dy .- Qf
-        Pf             .-= RPf .* dτ ./ K_max
+        @parallel residual_fluxes!(Rqx, Rqy, qx, qy, Pf, K, dx, dy)
+        @parallel update_fluxes!(qx, qy, Rqx, Rqy, cfl, nx, ny, re)
+        @parallel residual_pressure!(RPf, qx, qy, Qf, dx, dy)
+        @parallel update_pressure!(Pf, RPf, K_max, vdτ, ly, re)
         if iter % ncheck == 0
             err = maximum(abs.(RPf))
             push!(iters_evo, iter/nx); push!(errs_evo, err)
             # visu
-            qx_c .= avx(qx); qy_c .= avy(qy); qM .= sqrt.(qx_c.^2 .+ qy_c.^2)
+            qx_c .= Array(avx(qx)); qy_c .= Array(avy(qy)); qM .= sqrt.(qx_c.^2 .+ qy_c.^2)
             qx_c ./= qM; qy_c ./= qM
-            plt.fld.Pf[3] = Pf
-            plt.fld.K[3]  = log10.(K)
+            plt.fld.Pf[3] = Array(Pf)
+            plt.fld.K[3]  = Array(log10.(K))
             plt.fld.qM[3] = qM
             plt.fld.ar[3] = qx_c[1:st:end, 1:st:end]
             plt.fld.ar[4] = qy_c[1:st:end, 1:st:end]

@@ -2,5 +2,6 @@
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+ImplicitGlobalGrid = "4d7a3746-15be-11ea-1130-334b0c4f5fa0"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 ParallelStencil = "94395366-693c-11ea-3b26-d9b7aac5d958"

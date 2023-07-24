@@ -209,9 +209,9 @@ end
     logK .= log.(K)
     K_max = copy(K)
     # set wells location
-    x_iw, x_ew, z_w = ceil.(Int, (lx / 5 / dx, 4lx / 5 / dx, 0.45ly / dy))
-    Qf[x_iw:x_iw, z_w:z_w] .=  Q_in / dx / dy # injection
-    Qf[x_ew:x_ew, z_w:z_w] .= -Q_in / dx / dy # extraction
+    x_iw, x_ew, y_w = ceil.(Int, (lx / 5 / dx, 4lx / 5 / dx, 0.45ly / dy))
+    Qf[x_iw:x_iw, y_w:y_w] .=  Q_in / dx / dy # injection
+    Qf[x_ew:x_ew, y_w:y_w] .= -Q_in / dx / dy # extraction
     # init visu
     iters_evo = Float64[]; errs_evo = Float64[]
     qM, qx_c, qy_c = zeros(nx, ny), zeros(nx, ny), zeros(nx, ny)

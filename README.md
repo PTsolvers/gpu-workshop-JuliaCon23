@@ -319,7 +319,7 @@ The objective function $J$ is a function of the solution $\mathcal{L}$, which de
 
 <table>
   <td><p align="center">
-    <img src="docs/eqn/eq04.png" width="220px"/>
+    <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq04.png" width="220px"/>
   </p></td>
   <td>(1)</td>
 </table>
@@ -333,7 +333,7 @@ Note that the solution $\mathcal{L}$ is a vector containing the fluxes $\boldsym
 
 <table>
 <td><p align="center">
-  <img src="docs/eqn/eq05.png" width="260px""/>
+  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq05.png" width="260px""/>
 </p></td>
 <td>(2)</td>
 </table>
@@ -341,13 +341,13 @@ Note that the solution $\mathcal{L}$ is a vector containing the fluxes $\boldsym
 To compute this tricky term, we note that the solution to the forward problem nullifies the residual $R$. Since both $R_q=0$ and $R_{P_f}=0$ for any solution $\{\boldsymbol{q}, P_f\}$, the total derivative of $R_q$ and $R_{P_f}$ w.r.t. $K$ should be also $0$:
 
 <p align="center">
-  <img src="docs/eqn/eq06.png" width="480px"/>
+  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq06.png" width="480px"/>
 </p>
 
 This is the system of equations which could be solved for $\mathrm{d}\boldsymbol{q}/\mathrm{d}K$ and $\mathrm{d}P_f/\mathrm{d}K$. It useful to recast this system into a matrix form. Defining $R_{f,g} = \partial R_f/\partial g$ we obtain:
 
 <p align="center">
-  <img src="docs/eqn/eq07.png" width="360px"/>
+  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq07.png" width="360px"/>
 </p>
 
 One could solve this system of equations to compute the derivatives. However, the sizes of the unknowns $\mathrm{d}\boldsymbol{q}/\mathrm{d}K$ and $\mathrm{d}P_f/\mathrm{d}K$ are $N_{\boldsymbol{q}}\times N_K$ and $N_{P_f}\times N_K$, respectively. Recalling that in 2D number of grid points is $N = n_x\times n_y$, we can estimate that $N_{\boldsymbol{q}} = 2N$ since the vector field has 2 components in 2D, and $N_K = N$. Solving this system would be equivalent to the direct perturbation method, and is prohibitively expensive.
@@ -356,7 +356,7 @@ Luckily, we are only interested in evaluating the obejective function gradient (
 
 <table>
 <td><p align="center">
-  <img src="docs/eqn/eq08.png" width="350px"/>
+  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq08.png" width="350px"/>
 </p></td>
 <td>(3)</td>
 </table>
@@ -364,7 +364,7 @@ Luckily, we are only interested in evaluating the obejective function gradient (
 The sizes of the unknowns $\Psi_{\boldsymbol{q}}$ and $\Psi_{P_f}$ are $N_{\boldsymbol{q}}\times 1$ and $N_{P_f}\times 1$, respectively. Therefore, solving the adjoint equation involves only one linear solve! The "tricky term" in the objective function gradient could be then easily computed. This is most evident if we recast the equation (2) into the matrix form:
 
 <p align="center">
-  <img src="docs/eqn/eq09.png" width="500px"/>
+  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq09.png" width="500px"/>
 </p>
 
 Phew, there is a lot to process :sweat_smile:! We now established a very efficient way of computing point-wise gradients of the objective function. Now, we only need to figure out how to solve the adjoint equation (3).
@@ -373,7 +373,7 @@ Phew, there is a lot to process :sweat_smile:! We now established a very efficie
 In the same way that we solve the steady-state forward problem by integrating the equations given by residual $R$ in pseudo-time, we can augment the system (3) with the pseudo-time derivatives of the adjoint variables $\Psi_{\boldsymbol{q}}$ and $\Psi_{P_f}$:
 
 <p align="center">
-  <img src="docs/eqn/eq10.png" width="450px"/>
+  <img src="https://raw.githubusercontent.com/PTsolvers/gpu-workshop-JuliaCon23/main/docs/eqn/eq10.png" width="450px"/>
 </p>
 
 With this approach, we never need to explicitly store the matrix of the adjoint problem. Instead, we only need to evaluate the product of this matrix and the adjoint variables at the current iteration in pseudo-time. It is very similar to just computing the residuals of the current forward solution.

@@ -80,7 +80,7 @@ TODO list some of the Julia for HPC stack
 Today, we will develop code that:
 - Runs on multiple graphics cards using the Julia language
 - Uses a fully local and iterative approach (scalability)
-- Retrieves automatically the Jacobian Vector Product (JVP) using automatic differentiation (AD)
+- Retrieves automatically the vector-Jacobian product (VJP) using automatic differentiation (AD)
 - (All scripts feature about 300 lines of code)
 
 Too good to be true? Hold on 🙂 ...
@@ -376,9 +376,9 @@ In the same way that we solve the steady-state forward problem by integrating th
 
 With this approach, we never need to explicitly store the matrix of the adjoint problem. Instead, we only need to evaluate the product of this matrix and the adjoint variables at the current iteration in pseudo-time. It is very similar to just computing the residuals of the current forward solution.
 
-> :book: Note that the matrix in the adjoint equaiton is actually the transposed Jacobian matrix of the forward problem. Evaluating the product of the Jacobian matrix and a vector is a very common operation in computing, and this product is commonly abbreviated as JVP (_Jacobian-vector product_). Computing the product of the tranposed Jacobian matrix and a column vector is equivalent to the product of the row vector and the same Jacobian. Therefore, it is termed VPJ(_vector-Jacobian product_).
+> :book: Note that the matrix in the adjoint equaiton is actually the transposed Jacobian matrix of the forward problem. Evaluating the product of the Jacobian matrix and a vector is a very common operation in computing, and this product is commonly abbreviated as JVP (_Jacobian-vector product_). Computing the product of the tranposed Jacobian matrix and a column vector is equivalent to the product of the row vector and the same Jacobian. Therefore, it is termed VJP (_vector-Jacobian product_).
 
-To solve the adjoint problem, we need to evaluate the JVPs given the residuals for the forward problem. It is possible to do that either analytically, which involves manual derivation for the transposed Jacobian for every particular system of equations, or numerically in an automated way, using the _automatic differentiation_.
+To solve the adjoint problem, we need to evaluate the VJPs given the residuals for the forward problem. It is possible to do that either analytically, which involves manual derivation for the transposed Jacobian for every particular system of equations, or numerically in an automated way, using the _automatic differentiation_.
 
 </details>
 
@@ -402,7 +402,7 @@ Automatic differentiation is a key ingredient of [_differentiable programming_](
 Julia has a rich support for differential programming. With the power of tools like [Enzyme.jl](https://enzyme.mit.edu/julia/stable/) it is possible to automatically compute the derivatives of arbitrary Julia code, including the code targeting GPUs. 
 
 ### VJP calculations
-One of the main building blocks in many optimization algorithms involves computing the vector-Jacobian product (JVP). AD tools simplify evaluating JVPs by generating the code automatically given the target function.
+One of the main building blocks in many optimization algorithms involves computing the Jacobian-vector product (VJP). AD tools simplify evaluating VJPs by generating the code automatically given the target function.
 
 Let's familiarise with [Enzyme.jl](https://enzyme.mit.edu/julia/stable/), the Julia package for performing AD.
 
@@ -449,13 +449,13 @@ julia> x̄ ≈ π.*cos.(π.*x)
 true
 ```
 
-This syntax allows computing jacobian-vector products (JVPs):
+This syntax allows computing vector-Jacobian products (VJPs):
 
 ```julia
 @parallel ∇=(r->r̄, x->x̄) compute_sin!(r, float(π), x)
 ```
 
-In this case, `r̄` is an input vector, `x̄` is a storage for the partial derivative (JVP). We use the convention, according to which the bar above the variable denotes the "adjoint" of that variable.
+In this case, `r̄` is an input vector, `x̄` is a storage for the partial derivative (VJP). We use the convention, according to which the bar above the variable denotes the "adjoint" of that variable.
 
 Now we are familiar with Enzyme.jl and how to use it with ParallelStencil.jl. Let's begin the hands-on activity! :rocket:
 

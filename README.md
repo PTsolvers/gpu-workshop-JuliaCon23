@@ -21,10 +21,10 @@
   - Julia and the automatic differentiation (AD) tooling
 - [**Hands-on II** - HPC GPU-based inversions :computer:](#hands-on-ii)
   - The adjoint problem using AD
-  - GPU-based adjoint solver using [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) from [ParallelStencil.jl]() TODO
+  - GPU-based adjoint solver using [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) from [ParallelStencil.jl](https://github.com/omlins/ParallelStencil.jl)
   - Gradient-based inversion using [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl)
 - [Wrapping-up](#wrapping-up)
-  - **Demo**: Multi-GPU inversion using AD and distributed memory parallelisation with [ImplicitGlobalGrid.jl](https://github.com/luraess/ImplicitGlobalGrid.jl)
+  - **Demo**: Multi-GPU inversion using AD and distributed memory parallelisation with [ImplicitGlobalGrid.jl](https://github.com/eth-cscs/ImplicitGlobalGrid.jl)
   - What we learned - **recap**
 
 ## The `SMALL` print
@@ -37,7 +37,7 @@ We will not use any "black-box" tooling but rather try to develop concise and pe
 
 The main Julia packages we will rely on are:
 - [ParallelStencil.jl](https://github.com/omlins/ParallelStencil.jl) for architecture agnostic
-- [ImplicitGlobalGrid.jl](https://github.com/luraess/ImplicitGlobalGrid.jl) for distributed memory parallelisation
+- [ImplicitGlobalGrid.jl](https://github.com/eth-cscs/ImplicitGlobalGrid.jl) for distributed memory parallelisation
 - [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) for AD on GPUs
 - [CairoMakie.jl](https://github.com/MakieOrg/Makie.jl) for visualisation
 - [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl) to implement an optimised gradient-descent procedure
@@ -59,7 +59,11 @@ The fast-track is to clone this repo
 git clone https://github.com/PTsolvers/gpu-workshop-JuliaCon23.git
 ```
 
-Once done, navigate to the cloned folder, launch Julia (we will demo the workshop using VSCode on a Nvidia A100), and instantiate the project (upon typing `] instantiate` from within the REPL).
+Once done, navigate to the cloned folder, launch Julia (we will demo the workshop using VSCode on a Nvidia A100), and instantiate the project(upon typing
+```julia-repl
+] instantiate
+```
+from within the REPL.
 
 If all went fine, you should be able to execute the following command in your Julia REPL:
 ```julia-repl
@@ -71,9 +75,11 @@ which will produce this figure:
 ![out visu](docs/out_visu_2D.png)
 
 ## Julia for HPC
-The Julia at scale effort, the Julia HPC packages, and the overall Julia for HPC motivation (two language barrier)
+The Julia at scale effort:
+- Julia is fast as lower level code
+- Julia is interactive as higher-level code
 
-TODO list some of the Julia for HPC stack
+[**Julia is cool** 🙂 exactly for that](https://pde-on-gpu.vaw.ethz.ch/lecture1/#julia_is_cool)
 
 ### The (yet invisible) cool stuff
 Today, we will develop code that:
@@ -203,9 +209,10 @@ This acceleration implemented in the [geothermal_2D.jl](scripts/geothermal_2D.jl
 
 👉 Let's run the [geothermal_2D.jl](scripts/geothermal_2D.jl) script and check how the iteration count scales as function of grid resolution.
 
-> :bulb: Have a look at SCALES TODO workshop repo if you are interested in the intermediate steps.
+> :bulb: Have a look at [SCALES workshop](https://github.com/PTsolvers/Julia-HPC-Scales) repo if you are interested in working out the intermediate steps.
+
 ### ✏️ Task 3: Backend agnostic kernel programming with math-close notation
-Now that we have settled the algorithm, we want to implement it in a backend-agnostic fashion in order to overcome the two-language barrier, having a **unique script** to allow for rapid prototyping and efficient production use. This script should ideally target CPU and various GPU architectures and allow for "math-close" notation of the physics. For this purpose, we will use [ParallelStencil](). 
+Now that we have settled the algorithm, we want to implement it in a backend-agnostic fashion in order to overcome the two-language barrier, having a **unique script** to allow for rapid prototyping and efficient production use. This script should ideally target CPU and various GPU architectures and allow for "math-close" notation of the physics. For this purpose, we will use [ParallelStencil](https://github.com/omlins/ParallelStencil.jl). 
 
 👉 Let's open the [geothermal_2D_ps.jl](scripts/geothermal_2D_ps.jl) script and add the missing pieces following the steps.
 
@@ -266,7 +273,7 @@ As last step, we have to make sure to "gather" arrays for visualisation back to 
 
 👉 Run the [geothermal_2D_ps.jl](scripts/geothermal_2D_ps.jl) script and check execution speed on CPU and GPU (if available). Have a look at the [s_geothermal_2D_ps.jl](scripts_solutions/s_geothermal_2D_ps.jl) script if you are blocked or need hints.
 
-> :bulb: Have a look at SCALES TODO workshop repo if you are interested in the intermediate steps going from array to kernel programming on both CPU and GPU.
+> :bulb: Have a look at [SCALES workshop repo](https://github.com/PTsolvers/Julia-HPC-Scales) if you are interested in the intermediate steps going from array to kernel programming on both CPU and GPU.
 
 ## The optimisation problem
 In the first part of this workshop, we have learned how to compute the fluid pressure and fluxes in the computational domain with a given permeability distribution. In many practical applications the properties of the subsurface, such as the permeability, are unknown or poorly constrained, and the direct measurements are very sparse as they would require extracting the rock samples and performing laboratory experiments. In many cases, the _outputs_ of the simulation, i.e. the pressure and the fluxes, can be measured in the field at much higher spatial and temporal resolution. Therefore, it is useful to be able to determine such a distribution of the properties of the subsurface, that the modelled pressures and fluxes match the observations as close as possible. The task of finding this distribution is referred to as _the inverse modelling_. In this session, we will design and implement the inverse model for determining the permeability field, using the features of Julia, such as GPU programming, automatic differentiation, and numerical optimization packages.
@@ -299,7 +306,7 @@ The goal of the inverse modelling is to find such a distribution of the paramete
   <img src="docs/eqn/eq03.png" width="260px"/>
 </p>
 
-Therefore, the inverse modelling is tightly linked to the field of mathematical optimization. Numerous methods of finding the optimal value of $K$ exist, but in this workshop we will focus on _gradient-based_ methods. One of the simplest gradient-based method is the method of [_the gradient descent_](https://en.wikipedia.org/wiki/Gradient_descent), but there are many other powerful gradient-based methods such as quasi-Newton [_L-BFGS_](https://en.wikipedia.org/wiki/Limited-memory_BFGS) method.
+Therefore, the inverse modelling is tightly linked to the field of mathematical optimization. Numerous methods of finding the optimal value of $K$ exist, but in this workshop we will focus on _gradient-based_ methods. One of the simplest gradient-based method is the method of [**the gradient descent**](https://en.wikipedia.org/wiki/Gradient_descent), but there are many other powerful gradient-based methods such as quasi-Newton [**L-BFGS**](https://en.wikipedia.org/wiki/Limited-memory_BFGS) method.
 
 The gradient of the objective function with respect to the permeability $\mathrm{d}J/\mathrm{d}K$ is tricky to compute, since the objective function $J$ depends on the solution $\mathcal{L}$, which is given implicitly as the solution to the system of PDEs. To compute the gradient, we will use the _adjoint state method_. 
 
@@ -349,7 +356,7 @@ This is the system of equations which could be solved for $\mathrm{d}\boldsymbol
 
 One could solve this system of equations to compute the derivatives. However, the sizes of the unknowns $\mathrm{d}\boldsymbol{q}/\mathrm{d}K$ and $\mathrm{d}P_f/\mathrm{d}K$ are $N_{\boldsymbol{q}}\times N_K$ and $N_{P_f}\times N_K$, respectively. Recalling that in 2D number of grid points is $N = n_x\times n_y$, we can estimate that $N_{\boldsymbol{q}} = 2N$ since the vector field has 2 components in 2D, and $N_K = N$. Solving this system would be equivalent to the direct perturbation method, and is prohibitively expensive.
 
-Luckily, we are only interested in evaluating the obejective function gradient (1), which has the size of $1\times N_K$. This could be achieved by introducing extra variables $\Psi_{\boldsymbol{q}}$ and $\Psi_{P_f}$, called the _adjoint variables_. These adjoint variables satisfy the following _adjoint equation_:
+Luckily, we are only interested in evaluating the objective function gradient (1), which has the size of $1\times N_K$. This could be achieved by introducing extra variables $\Psi_{\boldsymbol{q}}$ and $\Psi_{P_f}$, called the _adjoint variables_. These adjoint variables satisfy the following _adjoint equation_:
 
 <table>
 <td><p align="center">
@@ -375,7 +382,7 @@ In the same way that we solve the steady-state forward problem by integrating th
 
 With this approach, we never need to explicitly store the matrix of the adjoint problem. Instead, we only need to evaluate the product of this matrix and the adjoint variables at the current iteration in pseudo-time. It is very similar to just computing the residuals of the current forward solution.
 
-> :book: Note that the matrix in the adjoint equaiton is actually the transposed Jacobian matrix of the forward problem. Evaluating the product of the Jacobian matrix and a vector is a very common operation in computing, and this product is commonly abbreviated as JVP (_Jacobian-vector product_). Computing the product of the tranposed Jacobian matrix and a column vector is equivalent to the product of the row vector and the same Jacobian. Therefore, it is termed VJP (_vector-Jacobian product_).
+> :book: Note that the matrix in the adjoint equation is actually the transposed Jacobian matrix of the forward problem. Evaluating the product of the Jacobian matrix and a vector is a very common operation in computing, and this product is commonly abbreviated as JVP (_Jacobian-vector product_). Computing the product of the transposed Jacobian matrix and a column vector is equivalent to the product of the row vector and the same Jacobian. Therefore, it is termed VJP (_vector-Jacobian product_).
 
 To solve the adjoint problem, we need to evaluate the VJPs given the residuals for the forward problem. It is possible to do that either analytically, which involves manual derivation for the transposed Jacobian for every particular system of equations, or numerically in an automated way, using the _automatic differentiation_.
 
@@ -496,7 +503,7 @@ You can temporarily comment the rest of the code and run it to make sure that it
 
 #### ✏️ Task 2: implementing objective function and its gradient
 
-We have two more new functions in the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl), namely `loss` and `∇loss!`. "Loss" is just another name for the objective function (which is also often called the "cost function"). It is obvious that in order to evaluate the loss function, one has to run the forward solver, and to evaluate the gradient, one needs to make the forward solve, followed by adjoint solve, and finally evaluate the gradient. Replace the `???` with corresponding calls to the forward and adjoint solvers, and finally call the gradient of the `residual_fluxes!` function. Look at the mathematial definition of the gradient $\mathrm{d}J/\mathrm{d}K$ to figure out how to initialize the parameters `R̄qx` and `R̄qy`.
+We have two more new functions in the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl), namely `loss` and `∇loss!`. "Loss" is just another name for the objective function (which is also often called the "cost function"). It is obvious that in order to evaluate the loss function, one has to run the forward solver, and to evaluate the gradient, one needs to make the forward solve, followed by adjoint solve, and finally evaluate the gradient. Replace the `???` with corresponding calls to the forward and adjoint solvers, and finally call the gradient of the `residual_fluxes!` function. Look at the mathematical definition of the gradient $\mathrm{d}J/\mathrm{d}K$ to figure out how to initialize the parameters `R̄qx` and `R̄qy`.
 
 In real world, the observations are sparse. We try to mimic this sparseness by saving only a subset of the synthetic solve results. We introduce the ranges containing the coordinates of observations:
 
@@ -570,10 +577,43 @@ plt.err[1] = Point2.(iters_evo, errs_evo)
 Congratulations :tada:, you successfully implemented the full inversion procedure! Despite being very simple and not robust enough, the algorithm reproduces the approximate location and the shape of the low-permeability barrier.
 
 ## Wrapping-up
-As final step, we will see that the inversion workflow we implemented allows to port our scripts to distributed memory parallelisation on e.g. multiple GPUs using [ImplicitGlobalGrid.jl]() and recap what we learned in this workshop.
+As final step, we can port our inversion workflow to distributed memory parallelisation on. e.g.. multiple GPUs using [ImplicitGlobalGrid.jl](https://github.com/eth-cscs/ImplicitGlobalGrid.jl).
 
 ### Scalable and multi-GPUs inversions
+The iterative workflow we introduced is readily extensible to supercomputing workflows, as we can leverage distributed memory parallelisation on CPUs **and GPUs**. To demonstrate this feature we will port the [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl) script to distributed memory parallelisation on multiple GPUs. The resulting script [geothermal_2D_ps_igg_inv.jl](scripts/geothermal_2D_ps_igg_inv.jli) implements the minor changes needed to achieve our final goal.
 
+Among the changes, we need now to use new packages:
+```julia
+using ImplicitGlobalGrid
+using MPI
+```
+define (costly) global operations:
+```julia
+sum_g(A) = (sum_l = sum(A); MPI.Allreduce(sum_l, MPI.SUM, MPI.COMM_WORLD))
+max_g(A) = (max_l = maximum(A); MPI.Allreduce(max_l, MPI.MAX, MPI.COMM_WORLD))
+```
+and a few other bits, mostly related to handling initial conditions with respect to local to global coordinates. The general approach we follow in here goes back to what is exemplified in more details in this [PDE on GPU course](https://pde-on-gpu.vaw.ethz.ch/lecture8/#fake_parallelisation). 
+
+The really cool thing is that the physics calculations remain unchanged! The only detail there is that we need to add "halo updates" for both the fluxes and adjoint fluxes, as well as for adjoint pressure since we apply boundary conditions on tha field.
+
+The last bit is that we need to replace the [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl) `LBFGS()`-based inversion algorithm by a custom gradient descent in order to avoid any global operations (that would require communication for global reductions):
+```julia
+for igd in 1:ngd
+    (me==0) && printstyled("> GD iter $igd \n"; bold=true, color=:green)
+    # evaluate gradient of the cost function
+    ∇J!(dJ_dlogK, logK)
+    # update logK
+    γ = Δγ / max_g(abs.(dJ_dlogK))
+    @. logK -= γ * dJ_dlogK
+    (me==0) && @printf "  min(K) = %1.2e \n" minimum(K)
+    # loss
+    push!(cost_evo, J(logK))
+    (me==0) && @printf "  --> Loss J = %1.2e (γ = %1.2e)\n" last(cost_evo)/first(cost_evo) γ
+end
+```
+
+With that we can see that we now can run our fully automatised AD-powered adjoint-based inversion on 4 Nvidia A100 GPUs :rocket:.
+
+![gpu inversion](docs/out_inv_end.png)
 
 ### Recap
-

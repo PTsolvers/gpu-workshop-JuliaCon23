@@ -6,14 +6,14 @@ using ParallelStencil.FiniteDifferences2D
 @init_parallel_stencil(CUDA, Float64, 2)
 
 @parallel function diffusion_step!(C2, C, D, dt, _dx, _dy)
-        @inn(C2) = @inn(C) + dt * @inn(D) * (@d2_xi(C) * _dx * _dx + @d2_yi(C) * _dy * _dy)
+    @inn(C2) = @inn(C) + dt * @inn(D) * (@d2_xi(C) * _dx * _dx + @d2_yi(C) * _dy * _dy)
     return
 end
 
 function perftest()
     nx = ny = 512 * 64
-    C  = @rand(nx, ny)
-    D  = @rand(nx, ny)
+    C = @rand(nx, ny)
+    D = @rand(nx, ny)
     _dx = _dy = dt = rand()
     C2 = copy(C)
     t_it = @belapsed begin

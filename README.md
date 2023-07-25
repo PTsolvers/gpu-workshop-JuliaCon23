@@ -68,11 +68,16 @@ The fast-track is to clone this repo
 git clone https://github.com/PTsolvers/gpu-workshop-JuliaCon23.git
 ```
 
-Once done, navigate to the cloned folder, launch Julia (we will demo the workshop using VSCode on a Nvidia A100), and instantiate the project(upon typing
+Once done, navigate to the cloned folder, launch Julia (we will demo the workshop using VSCode on a Nvidia A100) and activate the environment by typing
+```julia-repl
+] activate .
+```
+from within the REPL.
+Then follow it up with
 ```julia-repl
 ] instantiate
 ```
-from within the REPL.
+to instantiate the project and its dependencies.
 
 If all went fine, you should be able to execute the following command in your Julia REPL:
 ```julia-repl

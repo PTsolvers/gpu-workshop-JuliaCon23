@@ -279,7 +279,6 @@ As last step, we have to make sure to "gather" arrays for visualisation back to 
 In the first part of this workshop, we have learned how to compute the fluid pressure and fluxes in the computational domain with a given permeability distribution. In many practical applications the properties of the subsurface, such as the permeability, are unknown or poorly constrained, and the direct measurements are very sparse as they would require extracting the rock samples and performing laboratory experiments. In many cases, the _outputs_ of the simulation, i.e. the pressure and the fluxes, can be measured in the field at much higher spatial and temporal resolution. Therefore, it is useful to be able to determine such a distribution of the properties of the subsurface, that the modelled pressures and fluxes match the observations as close as possible. The task of finding this distribution is referred to as _the inverse modelling_. In this session, we will design and implement the inverse model for determining the permeability field, using the features of Julia, such as GPU programming, automatic differentiation, and numerical optimization packages.
 
 ### Introduction
-
 In the following, we will refer to the model that maps the permeability to the pressure and the fluxes as _the forward model_. Opposed to the _forward model_, the inputs of the _inverse model_ are the _observed_ values of the pressure and the fluxes, and the outputs are the distributions of the subsurface properties. The results of the inverse modelling can be then used to run a forward model to check if the modelled quantities indeed match the observed ones.
 
 Let's define the results of the forward model as the mapping $\mathcal{L}$ between the subsurface permeability field $K$ and the two fields: the pressure $P$ and the flux $\boldsymbol{q}$. To describe this mapping, we use the fact that the solution to the system of the governing equations for the pressure makes the residual $R$ to be equal to zero:
@@ -311,10 +310,9 @@ Therefore, the inverse modelling is tightly linked to the field of mathematical 
 The gradient of the objective function with respect to the permeability $\mathrm{d}J/\mathrm{d}K$ is tricky to compute, since the objective function $J$ depends on the solution $\mathcal{L}$, which is given implicitly as the solution to the system of PDEs. To compute the gradient, we will use the _adjoint state method_. 
 
 ### Adjoint state method
-
 Adjoint state method allows to compute the point-wise gradient of the scalar-valued objective function in an efficient manner by solving the _adjoint equation_, which is a linear system of equations having the same structure and the forward system.
 
-> :book: To save time, we have implemented the adjoint solver for you, but if you're interested in the detailed derivation of the adjoint equations, you can read them below.
+> :bulb: To save time, we have implemented the adjoint solver for you, but if you're interested in the detailed derivation of the adjoint equations, you can read them below.
 
 <details>
 <summary><h3>Derivation</h3></summary>
@@ -333,7 +331,6 @@ In this expression, some of the terms are easy to compute. If the cost function 
 > :warning: In this section we use the standard notation for partial and total derivatives. This is correct for the finite-dimensional analysis, i.e. for discretised versions of the equations. However, in the continuous case, the derivatives are the functional derivatives, and a more correct term for the objective function would be the "objective functional" since it acts on functions. In the workshop, we'll only work with the discretised form of equations, so we use the familiar notation to keep the explanation simple.
 
 Note that the solution $\mathcal{L}$ is a vector containing the fluxes $\boldsymbol{q}$ and the pressure $P_f$:
-
 
 <table>
 <td><p align="center">
@@ -404,7 +401,6 @@ To compute the product of the adjoint solution and the matrix of partial derivat
 Automatic differentiation is a key ingredient of [_differentiable programming_](https://en.wikipedia.org/wiki/Differentiable_programming), a programming paradigm enabling gradient-based optimisation of the parameters of an arbitrary computer program.
 
 ### AD tools in Julia
-
 Julia has a rich support for differential programming. With the power of tools like [Enzyme.jl](https://enzyme.mit.edu/julia/stable/) it is possible to automatically compute the derivatives of arbitrary Julia code, including the code targeting GPUs. 
 
 ### VJP calculations
@@ -415,8 +411,7 @@ Let's familiarise with [Enzyme.jl](https://enzyme.mit.edu/julia/stable/), the Ju
 > :bulb: There are many other Julia packages for performing AD, e.g., [Zygote.jl](https://fluxml.ai/Zygote.jl/stable/). In this tutorial, we use Enzyme as it supports some features currently missing in other packages, e.g., differentiating mutating functions and GPU kernels.
 
 Let's start with a simple example:
-
-```
+```julia-repl
 julia> using Enzyme
 
 julia> f(ω,x) = sin(ω*x)
@@ -426,7 +421,6 @@ julia> ∇f(ω,x) = Enzyme.autodiff(Reverse,f,Active,Const(ω),Active(x))[1][2]
 ∇f (generic function with 1 method)
 
 julia> @assert ∇f(π,1.0) ≈ π*cos(π)
-
 ```
 
 In this line: `∇f(x) = Enzyme.autodiff(Reverse,f,Active,Active(x))[1][1]`, we call `Enzyme.autodiff` function, which computes the partial derivatives. We pass `Reverse` as a first argument, which means that we use the reverse mode of accumulation (see below). We mark the arguments as either `Const` or `Active` to specify which partial derivatives are computed.
@@ -435,7 +429,7 @@ It is possible to use Enzyme.jl directly for more complicated tasks, such as com
 
 Let's extend the example with sine computation to the mutating vector-valued kernel:
 
-```
+```julia-repl
 julia> using ParallelStencil, ParallelStencil.FiniteDifferences2D
 
 julia> @init_parallel_stencil(Threads, Float64, 2)
@@ -456,7 +450,6 @@ true
 ```
 
 This syntax allows computing vector-Jacobian products (VJPs):
-
 ```julia
 @parallel ∇=(r->r̄, x->x̄) compute_sin!(r, float(π), x)
 ```
@@ -468,7 +461,7 @@ Now we are familiar with Enzyme.jl and how to use it with ParallelStencil.jl. Le
 ## Hands-on II
 In this section, we will implement the gradient-based inversion algorithm for the permeability of the subsurface. In the first session we used the model setup involving a permeability barrier in the center of the computational domain. Now, we will try reconstruct this permeability barrier knowing only the "observed" values of the pressure.
 
-> We will use the solution to the forward model as a synthetic dataset instead of real observations. We will only only a subset of the pressure field to emulate the sparsity of the datasets in the real world.
+> :bulb: We will use the solution to the forward model as a synthetic dataset instead of real observations. We will only only a subset of the pressure field to emulate the sparsity of the datasets in the real world.
 
 In this exercise, we will implement the gradient descent algorithm to progressively update the permeability $K$ using the gradient of the objective function to match the synthetically generated "observed" pressure field.
 
@@ -480,7 +473,7 @@ $$
 
 First, we will refactor the code in such a way that the forward (and adjoint) solution loop is in a separate function.
 
-#### ✏️ Task 1: refactor the code by extracting the forward and inverse solvers into the separate file
+### ✏️ Task 4: Refactor the code extracting the forward and inverse solvers into a separate file
 
 Start from the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl). Copy the implementations of all the kernels from the previous file with the forward solver.
 
@@ -499,9 +492,9 @@ The `...` syntax in Julia means that we expand the named tuple into the comma-se
 
 You can temporarily comment the rest of the code and run it to make sure that it works.
 
-> Note that we pass the logarithm of permeability  $K$ into both the forward and adjoint solvers. This is necessary since the permeability in the barrier is 6 orders of magnitude lower that that of the surrounding subsurface. This is characteristic for the Earth's crust. Using the logarithm of the permeability as the control variable makes the inversion procedure much more robust, and avoids accidentally making the permeability negative, with would result in instability.
+> :bulb: Note that we pass the logarithm of permeability  $K$ into both the forward and adjoint solvers. This is necessary since the permeability in the barrier is 6 orders of magnitude lower that that of the surrounding subsurface. This is characteristic for the Earth's crust. Using the logarithm of the permeability as the control variable makes the inversion procedure much more robust, and avoids accidentally making the permeability negative, with would result in instability.
 
-#### ✏️ Task 2: implementing objective function and its gradient
+### ✏️ Task 5: Implement objective function and its gradient
 
 We have two more new functions in the file [geothermal_2D_ps_inv.jl](scripts/geothermal_2D_ps_inv.jl), namely `loss` and `∇loss!`. "Loss" is just another name for the objective function (which is also often called the "cost function"). It is obvious that in order to evaluate the loss function, one has to run the forward solver, and to evaluate the gradient, one needs to make the forward solve, followed by adjoint solve, and finally evaluate the gradient. Replace the `???` with corresponding calls to the forward and adjoint solvers, and finally call the gradient of the `residual_fluxes!` function. Look at the mathematical definition of the gradient $\mathrm{d}J/\mathrm{d}K$ to figure out how to initialize the parameters `R̄qx` and `R̄qy`.
 
@@ -514,14 +507,12 @@ zobs_rng = LinRange(0.25lz, 0.85lz , 8)
 ```
 
 Then compute the indices of the grid cells corresponding to these locations:
-
 ```julia
 ixobs    = floor.(Int, (xobs_rng .- xc[1]) ./ dx) .+ 1
 izobs    = floor.(Int, (zobs_rng .- zc[1]) ./ dz) .+ 1
 ```
 
 And finally, store only the pressures at these locations after the synthetic solve:
-
 ```julia
 @info "Synthetic solve"
 #= ??? =#
@@ -533,7 +524,7 @@ As we'll see, the quality of inversions is significantly affected by the availab
 
 Try to execute the functions `loss` and `∇loss!` in the code to make sure your implementation works as expected.
 
-#### ✏️ Task 3: use Optim.jl to minimize the objective function
+### ✏️ Task 6: Use Optim.jl to minimize the objective function
 We can use the functions `loss` and `∇loss!` to iteratively update the permeability. We introduce the following shortcuts using the Julia [closures syntax](https://docs.julialang.org/en/v1/devdocs/functions/#Closures):
 
 ```julia
@@ -596,6 +587,8 @@ and a few other bits, mostly related to handling initial conditions with respect
 
 The really cool thing is that the physics calculations remain unchanged! The only detail there is that we need to add "halo updates" for both the fluxes and adjoint fluxes, as well as for adjoint pressure since we apply boundary conditions on tha field.
 
+In addition, combining [ImplicitGlobalGrid.jl](https://github.com/eth-cscs/ImplicitGlobalGrid.jl) to [ParallelStencil.jl](https://github.com/omlins/ParallelStencil.jl) allows for hiding MPi coomunication behind inner local domain computations via the `@hide_communication` macro.
+
 The last bit is that we need to replace the [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl) `LBFGS()`-based inversion algorithm by a custom gradient descent in order to avoid any global operations (that would require communication for global reductions):
 ```julia
 for igd in 1:ngd
@@ -612,8 +605,15 @@ for igd in 1:ngd
 end
 ```
 
-With that we can see that we now can run our fully automatised AD-powered adjoint-based inversion on 4 Nvidia A100 GPUs :rocket:.
+With that we can see that we now can run our fully automatised AD-powered adjoint-based inversion on 4 Nvidia A100 GPUs :rocket::
 
 ![gpu inversion](docs/inv_end.png)
 
 ### Recap
+In this workshop, we learned about:
+- a simple but efficient way to accelerate iterative solvers using a physics-motivated algorithmic optimisation technique
+- a concise and backend-agnostic programming approach in [Julia](https://julialang.org) to leverage the computing power of graphic processing units ([ParallelStencil.jl](https://github.com/omlins/ParallelStencil.jl))
+- an effective inversion approach using the adjoint state method and retrieving the adjoint variables automatically via automatic differentiation tools on GPUs
+- a few minor modification steps to execute the inversion script on multiple GPUs allowing for massively parallel large scale inversions on GPU-powered supercomputers
+
+Thanks for making it up to here :100:

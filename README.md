@@ -72,7 +72,7 @@ julia> include("scripts/visu_2D.jl")
 
 which will produce this figure:
 
-![out visu](docs/out_visu_2D.png)
+![out visu](docs/visu_2D.png)
 
 ## Julia for HPC
 The Julia at scale effort:
@@ -614,6 +614,6 @@ end
 
 With that we can see that we now can run our fully automatised AD-powered adjoint-based inversion on 4 Nvidia A100 GPUs :rocket:.
 
-![gpu inversion](docs/out_inv_end.png)
+![gpu inversion](docs/inv_end.png)
 
 ### Recap

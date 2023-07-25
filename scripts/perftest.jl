@@ -21,7 +21,7 @@ function perftest()
     end
     T_eff = (2 * 1 + 1) / 1e9 * nx * ny * sizeof(Float64) / t_it
     println("T_eff = $(T_eff) GiB/s using CUDA.jl on a Nvidia Tesla A100 GPU")
-    println("So that's cool. We are getting close to hardware limit, running at $(round(T_eff/1355*100), sigdigits=2) % of memory copy! 🚀")
+    println("So that's cool. We are getting close to hardware limit, running at $(round(T_eff/1355*100, sigdigits=2)) % of memory copy! 🚀")
     return
 end
 

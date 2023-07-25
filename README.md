@@ -616,4 +616,4 @@ In this workshop, we learned about:
 - an effective inversion approach using the adjoint state method and retrieving the adjoint variables automatically via automatic differentiation tools on GPUs
 - a few minor modification steps to execute the inversion script on multiple GPUs allowing for massively parallel large scale inversions on GPU-powered supercomputers
 
-Thanks for making it up to here :100:
+Congrats for making it up to here :100:

@@ -14,7 +14,7 @@ using ParallelStencil.FiniteDifferences2D
                                                   max.(A[2:end-1, 1:end-2], A[2:end-1, 3:end])))
 
 @parallel function smooth_d!(A2, A)
-        @inn(A2) = @inn(A) + 0.2 * (@d2_xi(A) + @d2_yi(A))
+    @inn(A2) = @inn(A) + 0.2 * (@d2_xi(A) + @d2_yi(A))
     return
 end
 

@@ -54,6 +54,15 @@ The workshop promotes "hands-on". Blanked-out scripts for most of the steps are 
 ## Getting started
 Before we start, let's make sure that everyone can run the presented codes on either their local or remote CPU, ideally GPU machine.
 
+> ⚠️ We are using some exciting latest features from the Julia GPU and AD stack which requires to run on **Julia 1.9.2**, using:
+```
+Enzyme v0.11.6
+ImplicitGlobalGrid v0.13.0
+MPI v0.20.12
+ParallelStencil v0.8.1
+```
+for a smooth experience.
+
 The fast-track is to clone this repo
 ```
 git clone https://github.com/PTsolvers/gpu-workshop-JuliaCon23.git

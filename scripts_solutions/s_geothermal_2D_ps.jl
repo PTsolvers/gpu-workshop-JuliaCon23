@@ -14,7 +14,7 @@ using ParallelStencil.FiniteDifferences2D
 @parallel function residual_fluxes!(Rqx, Rqy, qx, qy, Pf, K, dx, dy)
     @inn_x(Rqx) = @inn_x(qx) + @av_xa(K) * @d_xa(Pf) / dx
     @inn_y(Rqy) = @inn_y(qy) + @av_ya(K) * @d_ya(Pf) / dy
-return
+    return
 end
 
 @parallel function residual_pressure!(RPf, qx, qy, Qf, dx, dy)

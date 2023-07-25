@@ -24,43 +24,42 @@
   - GPU-based adjoint solver using [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) from [ParallelStencil.jl]() TODO
   - Gradient-based inversion using [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl)
 - [Wrapping-up](#wrapping-up)
-  - **Demo**: Multi-GPU inversion using AD and distributed-memory parallelisation with [ImplicitGlobalGrid.jl]() TODO
+  - **Demo**: Multi-GPU inversion using AD and distributed memory parallelisation with [ImplicitGlobalGrid.jl](https://github.com/luraess/ImplicitGlobalGrid.jl)
   - What we learned - **recap**
 
 ## The `SMALL` print
 The goal of today's workshop is to develop a fast iterative GPU-based solver for elliptic equations and use it to:
 1. Solve a steady state subsurface flow problem (geothermal operations, injection and extraction of fluids)
 2. Invert for the subsurface permeability having a sparse array of fluid pressure observations
-3. See that the approach works using a distributed memory parallelisation on multiple GPUs
+3. Verify that the approach works using a distributed memory parallelisation on multiple GPUs
 
-We will not use any "black-box" tooling but rather try to develop concise and performant codes (300 lines of code, max) that execute on (multi-)GPUs. We will also use automatic differentiation (AD) capabilities and the differentiable Julia stack to automatise the calculation of the adjoint solutions in the gradient-based inversion procedure.
+We will not use any "black-box" tooling but rather try to develop concise and performant codes (300 lines of code, max) that execute on multiple GPUs. We will also use automatic differentiation (AD) capabilities and the differentiable Julia stack to automatise the calculation of the adjoint solutions in the gradient-based inversion procedure.
 
 The main Julia packages we will rely on are:
-- [ParallelStencil.jl]() for architecture agnostic TODO
-- [ImplicitGlobalGrid.jl]() for distributed memory parallelisation TODO
+- [ParallelStencil.jl](https://github.com/omlins/ParallelStencil.jl) for architecture agnostic
+- [ImplicitGlobalGrid.jl](https://github.com/luraess/ImplicitGlobalGrid.jl) for distributed memory parallelisation
 - [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) for AD on GPUs
 - [CairoMakie.jl](https://github.com/MakieOrg/Makie.jl) for visualisation
 - [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl) to implement an optimised gradient-descent procedure
 
-Most of the workshop is based on "hands-on". Changes to the scripts are incremental and should allow to build up complexity throughout the day. Blanked-out scripts for most of the steps are available in the [scripts](scripts/) folder. Solutions scripts (following the `s_xxx.jl` pattern) will are available in the [scripts_solutions](scripts_solutions) folder.
+The workshop promotes "hands-on". Blanked-out scripts for most of the steps are available in the [scripts](scripts/) folder. Solutions scripts (following the `s_xxx.jl` pattern) will are available in the [scripts_solutions](scripts_solutions) folder.
 
-:rocket: **Note that we will not extensively investigate performance during this workshop because of time limitations. However, there will be talk given by Sam Omlin focussing specifically on this topic:**
-TODO
+:rocket: Note that we will not extensively investigate performance during this workshop because of time limitations. However, there will be **talk given by Sam Omlin focussing specifically on this topic: [Scalable 3-D PDE Solvers Tackling Hardware Limit](https://pretalx.com/juliacon2023/talk/BLCWQW/).**
 
 #### :bulb: Useful extra resources
 - The Julia language: [https://julialang.org](https://julialang.org)
 - PDE on GPUs ETH Zurich course: [https://pde-on-gpu.vaw.ethz.ch](https://pde-on-gpu.vaw.ethz.ch)
-- SCALES workshop link TODO
+- SCALES workshop: [https://github.com/PTsolvers/Julia-HPC-Scales](https://github.com/PTsolvers/Julia-HPC-Scales)
 
 ## Getting started
 Before we start, let's make sure that everyone can run the presented codes on either their local or remote CPU, ideally GPU machine.
 
 The fast-track is to clone this repo
 ```
-git clone TODO
+git clone https://github.com/PTsolvers/gpu-workshop-JuliaCon23.git
 ```
 
-Once done, navigate to the cloned folder, launch Julia (we will demo the workshop using VSCode), and instantiate the project (upon typing `] instantiate` from within the REPL).
+Once done, navigate to the cloned folder, launch Julia (we will demo the workshop using VSCode on a Nvidia A100), and instantiate the project (upon typing `] instantiate` from within the REPL).
 
 If all went fine, you should be able to execute the following command in your Julia REPL:
 ```julia-repl

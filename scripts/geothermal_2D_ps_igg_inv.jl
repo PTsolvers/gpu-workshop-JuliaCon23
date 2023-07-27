@@ -337,7 +337,6 @@ end
             (igd % 5 == 0) && CairoMakie.save("out_inv_$igd.png", fig)
         end
     end
-
     finalize_global_grid(finalize_MPI=true)
     return
 end

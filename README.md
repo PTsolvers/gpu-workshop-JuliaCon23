@@ -36,7 +36,7 @@ The goal of today's workshop is to develop a fast iterative GPU-based solver for
 We will not use any "black-box" tooling but rather try to develop concise and performant codes (300 lines of code, max) that execute on multiple GPUs. We will also use automatic differentiation (AD) capabilities and the differentiable Julia stack to automatise the calculation of the adjoint solutions in the gradient-based inversion procedure.
 
 The main Julia packages we will rely on are:
-- [ParallelStencil.jl](https://github.com/omlins/ParallelStencil.jl) for architecture agnostic
+- [ParallelStencil.jl](https://github.com/omlins/ParallelStencil.jl) for automatic optimization and architecture agnostic shared memory parallelisation
 - [ImplicitGlobalGrid.jl](https://github.com/eth-cscs/ImplicitGlobalGrid.jl) for distributed memory parallelisation
 - [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) for AD on GPUs
 - [CairoMakie.jl](https://github.com/MakieOrg/Makie.jl) for visualisation
